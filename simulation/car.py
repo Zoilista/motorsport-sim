@@ -59,9 +59,26 @@ class Car:
     # Fuel mass and deterministic consumption
     fuel: float = 100.0  # Initial 100.0 kg
     fuel_flow_kgh: float = 0.0  # kg/h flow rate
+    dry_mass_kg: float = 798.0  # FIA minimum dry car + driver mass (kg)
 
     _defaults_captured: bool = False
     _default_setup: dict | None = None
+
+    @property
+    def total_mass_kg(self) -> float:
+        """Total dynamic vehicle mass including instantaneous fuel load (kg)."""
+        return self.dry_mass_kg + max(0.0, self.fuel)
+
+    @property
+    def mass_factor(self) -> float:
+        """Inertial acceleration, braking, and load scaling relative to baseline (798kg dry + 10kg fuel).
+
+        Calibrated to reflect empirical high-downforce F1 behavior where total vertical load
+        is dominated by aerodynamic downforce (~2500kg), yielding ~0.33 - 0.38 s / 10 kg lap time delta.
+        """
+        base_mass = self.dry_mass_kg + 10.0
+        fuel_excess = max(0.0, self.fuel - 10.0)
+        return max(0.6, min(1.1, base_mass / (base_mass + fuel_excess * 0.65)))
 
     @property
     def ers_soc_pct(self) -> float:
@@ -296,9 +313,9 @@ class Car:
                 self.brake = 0.0
             return
 
-        # Effective braking capability influenced by driver braking skill
+        # Effective braking capability influenced by driver braking skill and vehicle mass
         skill_multiplier = 0.85 + (getattr(self.driver, "braking_skill", 0.85) * 0.15)
-        effective_brake_decel = self.max_brake_decel * skill_multiplier
+        effective_brake_decel = self.max_brake_decel * skill_multiplier * self.mass_factor
 
         # Check upcoming corners within 450m horizon
         upcoming = track_obj.get_upcoming_corners(self.position, horizon_m=450.0)
@@ -316,7 +333,7 @@ class Car:
                 downforce_bonus *= 0.90
 
             tyre_grip = self.tyres.get_compound_grip() if (hasattr(self, "tyres") and self.tyres) else 1.0
-            grip_factor = math.sqrt(max(0.2, self.grip_multiplier * tyre_grip))
+            grip_factor = math.sqrt(max(0.2, self.grip_multiplier * tyre_grip)) * (self.mass_factor ** 0.5)
             target_v = corner.apex_speed_ms * grip_factor * downforce_bonus * (0.98 + 0.04 * (consistency - 0.9))
 
             if dist == 0.0:
@@ -387,7 +404,7 @@ class Car:
 
         if self.brake > 0.01:
             skill_mult = 0.85 + (getattr(self.driver, "braking_skill", 0.85) * 0.15)
-            actual_brake_accel = self.max_brake_decel * skill_mult * self.brake
+            actual_brake_accel = self.max_brake_decel * skill_mult * self.brake * self.mass_factor
             brake_decel = actual_brake_accel + a_drag
             self.speed_ms = max(0.0, self.speed_ms - brake_decel * dt)
 
@@ -415,13 +432,13 @@ class Car:
                 self.fuel = 0.0
                 self.fuel_flow_kgh = 0.0
             else:
-                base_engine_accel = self.acceleration * agg_mult * power_factor * self.throttle
+                base_engine_accel = self.acceleration * agg_mult * power_factor * self.throttle * self.mass_factor
 
             # Hybrid Powertrain Deploy & Manual Override Mode (MOM)
             electric_accel_boost = 0.0
             if self.mom_active and self.ers_soc_pct >= 10.0:
-                # MOM: Extra 350 kW electrical boost added to engine
-                electric_accel_boost = 350_000.0 / (790.0 * max(20.0, self.speed_ms))
+                # MOM: Extra 350 kW electrical boost added to engine (a = P / (M * v))
+                electric_accel_boost = 350_000.0 / (self.total_mass_kg * max(20.0, self.speed_ms))
                 electric_accel_boost = min(6.0, max(2.5, electric_accel_boost))
 
                 # Rapid battery depletion: 350 kW rate (0.35 MJ/s)
@@ -434,7 +451,7 @@ class Car:
                     self.mom_active = False
             elif is_straight and self.throttle > 0.5 and self.ers_soc_pct > 5.0:
                 # Standard Hybrid Deploy: ~120 kW baseline assist
-                electric_accel_boost = 1.4 * self.throttle
+                electric_accel_boost = 1.4 * self.throttle * self.mass_factor
                 deplete_mj = 0.120 * self.throttle * dt
                 self.ers_energy_mj = max(0.0, self.ers_energy_mj - deplete_mj)
                 self.ers_status = "DEPLOY"
