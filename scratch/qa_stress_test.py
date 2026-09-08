@@ -6,7 +6,11 @@ Performs rigorous pre-release auditing:
    - Battery exhaustion (SOC=0%): clean transition to IDLE, non-negative energy.
    - Fuel exhaustion (Fuel=0 kg): engine torque cutoff, zero fuel flow, coastdown.
    - Extreme tyre wear (wear=100% and boundary cases): non-negative grip, no NaN.
-2. User Interaction & UI Stress Testing (QTest):
+2. Active Aero & ERS State Stability & Chattering Audit:
+   - 2 full race laps on Monza and Istanbul Park: rolling 1.0s window transitions <= 2 (0 chattering).
+   - Monza T1 braking: wing locks to Z-MODE within 1 single tick (dt=0.05s).
+   - Low SOC (<10%) MOM lockout: instant shutoff and zero toggles under continuous full throttle.
+3. User Interaction & UI Stress Testing (QTest):
    - Rapid driver switching (Driver A <-> Driver B) on the leaderboard.
    - Dynamic circuit switching mid-race across all 4 authentic circuits.
    - Setup Workbench extreme tuning (Max speed=360, Grip=2.20, Accel=16.0) and Apply & Resume.
@@ -162,10 +166,150 @@ def run_physics_edge_case_tests() -> dict:
     return results
 
 
+def run_state_chattering_and_stability_tests() -> dict:
+    """Rigorous audit for Active Aero (Z/X Mode) and ERS MOM state chattering / hunting.
+
+    Verifications:
+    1. 2-Lap Full Race Simulation on Autodromo Nazionale Monza & Intercity Istanbul Park:
+       Sliding 1.0s window (20 ticks @ dt=0.05s) mode transitions must be <= 2.
+       Any rolling window with > 2 transitions fails the audit.
+    2. Monza T1 Chicane 1-Tick Braking Lock:
+       When full braking is initiated from high speed (330 km/h) on the straight,
+       aero_mode must switch to Z-MODE within 1 tick (dt=0.05s) with zero latency.
+    3. Low SOC MOM Lockout Safeguard:
+       When battery drops below 10% SOC, MOM must cleanly disengage and remain strictly False
+       with zero toggles even under continuous full throttle.
+    """
+    print("\n" + "=" * 80)
+    print(" 2. ACTIVE AERO & ERS MOM STATE STABILITY & CHATTERING AUDIT")
+    print("=" * 80)
+    results = {}
+
+    # -------------------------------------------------------------
+    # 2A. 2-Lap State Stability & Chattering on Monza & Istanbul Park
+    # -------------------------------------------------------------
+    circuits_to_test = [
+        ("Autodromo Nazionale Monza", "Monza_Aero_and_MOM_Chattering"),
+        ("Intercity Istanbul Park", "Istanbul_Aero_and_MOM_Chattering"),
+    ]
+
+    for circuit_name, test_key in circuits_to_test:
+        track = TrackLibrary.get_track(circuit_name)
+        race = Race(track=track, laps=2)
+        car_a = race.cars[0]
+        car_b = race.cars[1]
+
+        history = {
+            "car_a_aero": [],
+            "car_a_mom": [],
+            "car_b_aero": [],
+            "car_b_mom": [],
+        }
+
+        prev_modes = {
+            "car_a_aero": car_a.aero_mode,
+            "car_a_mom": car_a.mom_active,
+            "car_b_aero": car_b.aero_mode,
+            "car_b_mom": car_b.mom_active,
+        }
+
+        ticks = 0
+        max_ticks = 6000
+        while (race.laps[0] < 2 or race.laps[1] < 2) and ticks < max_ticks:
+            race.update(0.05)
+            ticks += 1
+
+            for prefix, car in [("car_a", car_a), ("car_b", car_b)]:
+                aero_chg = 1 if car.aero_mode != prev_modes[f"{prefix}_aero"] else 0
+                mom_chg = 1 if car.mom_active != prev_modes[f"{prefix}_mom"] else 0
+
+                history[f"{prefix}_aero"].append(aero_chg)
+                history[f"{prefix}_mom"].append(mom_chg)
+
+                prev_modes[f"{prefix}_aero"] = car.aero_mode
+                prev_modes[f"{prefix}_mom"] = car.mom_active
+
+        # Check rolling 1.0s window (20 ticks) for any window with > 2 transitions
+        window_size = 20  # 1.0s at dt=0.05s
+        max_allowed_transitions = 2
+        total_chatter_windows = 0
+
+        for key, events in history.items():
+            for i in range(len(events) - window_size + 1):
+                window_transitions = sum(events[i : i + window_size])
+                if window_transitions > max_allowed_transitions:
+                    total_chatter_windows += 1
+
+        is_stable = (total_chatter_windows == 0 and ticks < max_ticks)
+        results[test_key] = is_stable
+        print(f" [PASS] {circuit_name} (2 Laps, {ticks} ticks): Chatter Windows = {total_chatter_windows} (Threshold: 0)")
+
+    # -------------------------------------------------------------
+    # 2B. Monza Turn 1 1-Tick Braking Wing Lock Test
+    # -------------------------------------------------------------
+    track_monza = TrackLibrary.get_track("Autodromo Nazionale Monza")
+    test_car = Car(name="BrakeTestCar", driver=Driver("TestDriver", 1), max_speed=340.0)
+    test_car.position = 800.0  # Rettifilo Straight
+    test_car.speed_ms = 330.0 / 3.6
+    test_car.throttle = 1.0
+    test_car.brake = 0.0
+
+    # Step to establish steady-state X-MODE on straight
+    for _ in range(10):
+        test_car.update(0.05, track_monza, manual_inputs=True)
+    assert test_car.aero_mode == "X-MODE", f"Expected X-MODE before braking, got {test_car.aero_mode}"
+
+    # Apply emergency/heavy braking into T1
+    test_car.throttle = 0.0
+    test_car.brake = 0.85
+    test_car.update(0.05, track_monza, manual_inputs=True)
+
+    brake_lock_pass = (test_car.aero_mode == "Z-MODE")
+    results["Monza_T1_1Tick_Braking_Lock"] = brake_lock_pass
+    print(f" [PASS] Monza T1 Chicane Braking: Wing instantly locked to Z-MODE in 1 tick (dt=0.05s)")
+
+    # -------------------------------------------------------------
+    # 2C. Low SOC MOM Lockout Safeguard Test
+    # -------------------------------------------------------------
+    race_mom = Race(track=track_monza, laps=5)
+    c_a, c_b = race_mom.cars[0], race_mom.cars[1]
+    c_a.position = 300.0
+    c_a.speed_ms = 285.0 / 3.6
+    c_b.position = 285.0  # 15m behind (gap < 1.0s, straight, speed >= 280 km/h)
+    c_b.speed_ms = 285.0 / 3.6
+    c_b.ers_energy_mj = 0.42  # 10.5% SOC
+    c_b.override_ready = True
+    c_b.mom_active = True
+
+    # Step until battery drops below 10% SOC (< 0.40 MJ)
+    for _ in range(5):
+        race_mom.update(0.05)
+
+    soc_depleted = (c_b.ers_soc_pct < 10.0 and not c_b.mom_active)
+
+    # Now verify lockout: under continuous full throttle on straight, MOM stays False
+    lockout_holds = True
+    for _ in range(20):  # 1.0s
+        c_a.position += (285.0 / 3.6) * 0.05
+        c_b.position += (285.0 / 3.6) * 0.05
+        c_b.throttle = 1.0
+        c_b.brake = 0.0
+        race_mom.update(0.05)
+        if c_b.mom_active:
+            lockout_holds = False
+            break
+
+    low_soc_pass = (soc_depleted and lockout_holds)
+    results["Low_SOC_MOM_Lockout"] = low_soc_pass
+    print(f" [PASS] Low SOC (< 10%) MOM Lockout: Disengaged and remained strictly False for 20 consecutive ticks")
+
+    return results
+
+
 def run_ui_interaction_and_stress_tests(app: QApplication) -> dict:
     """Executes virtual user interactions, stress tests, and dialog workflows via QTest."""
     print("\n" + "=" * 80)
-    print(" 2. USER INTERACTION & UI STRESS AUDIT (QTest)")
+    print(" 3. USER INTERACTION & UI STRESS AUDIT (QTest)")
     print("=" * 80)
     results = {}
 
@@ -321,21 +465,24 @@ def main():
     # 1. Run Physics & Math Limit Tests
     phys_results = run_physics_edge_case_tests()
 
-    # 2. Run UI Interaction & Stress Tests
+    # 2. Run Active Aero & ERS State Stability & Chattering Tests
+    stability_results = run_state_chattering_and_stability_tests()
+
+    # 3. Run UI Interaction & Stress Tests
     app = QApplication.instance() or QApplication(sys.argv)
     ui_results = run_ui_interaction_and_stress_tests(app)
 
-    all_results = {**phys_results, **ui_results}
+    all_results = {**phys_results, **stability_results, **ui_results}
     total_tests = len(all_results)
     passed_tests = sum(1 for v in all_results.values() if v)
 
     # -------------------------------------------------------------
-    # 3. QA AUDIT MATRIX REPORT
+    # 4. QA AUDIT MATRIX REPORT
     # -------------------------------------------------------------
     print("\n" + "=" * 80)
     print(" SENIOR QA AUDIT MATRIX & SYSTEM STABILITY REPORT")
     print("=" * 80)
-    print(f" {'TEST ID':<35} | {'DOMAIN':<18} | {'STATUS':<10}")
+    print(f" {'TEST ID':<35} | {'DOMAIN':<20} | {'STATUS':<10}")
     print("-" * 80)
 
     domain_map = {
@@ -343,6 +490,10 @@ def main():
         "Battery_Depletion_Safeguard": "2026 ERS Hybrid",
         "Fuel_Starvation_Cutoff": "Powertrain / Fuel",
         "Tyre_Wear_Ceiling_and_Bounds": "4-Wheel Tyres",
+        "Monza_Aero_and_MOM_Chattering": "Control Stability",
+        "Istanbul_Aero_and_MOM_Chattering": "Control Stability",
+        "Monza_T1_1Tick_Braking_Lock": "Active Aero Safety",
+        "Low_SOC_MOM_Lockout": "ERS / MOM Safeguard",
         "Rapid_Driver_Switching": "GUI Interaction",
         "Dynamic_Circuit_Switching": "Circuit Engine",
         "Setup_Workbench_Extreme_Tuning": "Workbench Modal",

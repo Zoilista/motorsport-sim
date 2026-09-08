@@ -100,12 +100,17 @@ class Race:
                 else:
                     car_i.in_dirty_air = False
 
-                # Rule 3: Manual Override Mode (MOM) Detection (gap <= 1.0s, straight, speed >= 280 km/h)
-                if is_straight and time_delta_s <= 1.0 and car_i.speed >= 280.0:
+                # Rule 3: Manual Override Mode (MOM) Detection with Hysteresis
+                # Activation: is_straight, gap <= 1.0s, speed >= 280.0 km/h, brake <= 0.01
+                if is_straight and time_delta_s <= 1.0 and car_i.speed >= 280.0 and car_i.brake <= 0.01:
                     car_i.override_ready = True
                     # Driver AI activates MOM when override is ready and battery is sufficient
-                    if car_i.ers_soc_pct >= 10.0 and car_i.throttle > 0.90 and car_i.brake <= 0.01:
+                    if car_i.ers_soc_pct >= 10.0 and car_i.throttle > 0.90:
                         car_i.mom_active = True
+                elif car_i.override_ready:
+                    # Maintain override_ready until hysteresis threshold (gap > 1.25s or speed < 272 km/h)
+                    if time_delta_s > 1.25 or car_i.speed < 272.0 or not is_straight or car_i.brake > 0.01:
+                        car_i.override_ready = False
                 else:
                     car_i.override_ready = False
             else:

@@ -37,8 +37,10 @@ class Car:
 
     # 2026 Regulations: Active Aero (Z-Mode / X-Mode) & Slipstream
     aero_mode: str = "Z-MODE"  # "Z-MODE" (Cornering/Braking) or "X-MODE" (Straight/Low Drag)
+    aero_mode_hold_timer: float = 1.0  # Dwell time in current aero mode for debouncing (s)
     slipstream_reduction: float = 0.0  # 0.15 to 0.35 drag reduction when trailing in straight
     in_dirty_air: bool = False  # 10% downforce penalty when trailing in corners
+    _in_braking_zone: bool = False  # Hysteresis latch for corner approach braking
 
     # 2026 Regulations: Hybrid ERS (4.0 MJ Battery Depot & Manual Override Mode)
     ers_max_energy_mj: float = 4.0
@@ -214,17 +216,28 @@ class Car:
                 if dist_to_corner <= 35.0:
                     approaching_corner = True
 
+        # Advance Active Aero state dwell timer
+        self.aero_mode_hold_timer += dt
+
         # 2026 Active Aero (Z-Mode vs X-Mode) & MOM Mode Evaluation
         if self.in_pit_lane or self.brake > 0.01 or not is_straight or approaching_corner or not steering_straight:
-            # Revert instantly without delay upon braking, approaching/in corners, or in pit lane
-            self.aero_mode = "Z-MODE"
+            # Revert instantly without delay upon braking, approaching/in corners, or in pit lane (Safety Lock)
+            if self.aero_mode != "Z-MODE":
+                self.aero_mode = "Z-MODE"
+                self.aero_mode_hold_timer = 0.0
             self.mom_active = False
-        elif is_straight and steering_straight and self.throttle > 0.95:
-            self.aero_mode = "X-MODE"
         else:
-            self.aero_mode = "Z-MODE"
+            # On straightaway: apply debounce dwell time (0.40s) and throttle hysteresis ([0.85, 0.95])
+            if self.aero_mode == "Z-MODE":
+                if self.throttle >= 0.95 and self.aero_mode_hold_timer >= 0.40:
+                    self.aero_mode = "X-MODE"
+                    self.aero_mode_hold_timer = 0.0
+            elif self.aero_mode == "X-MODE":
+                if self.throttle < 0.85 and self.aero_mode_hold_timer >= 0.40:
+                    self.aero_mode = "Z-MODE"
+                    self.aero_mode_hold_timer = 0.0
 
-        if not is_straight or self.in_pit_lane or self.ers_soc_pct < 10.0:
+        if not is_straight or self.in_pit_lane or self.ers_soc_pct < 10.0 or self.brake > 0.01 or (self.mom_active and self.speed_ms < 272.0 / 3.6):
             self.mom_active = False
 
         # 2. Longitudinal Vehicle Physics Integration
@@ -268,6 +281,8 @@ class Car:
         self.ers_energy_mj = 3.4
         self.ers_status = "IDLE"
         self.aero_mode = "Z-MODE"
+        self.aero_mode_hold_timer = 1.0
+        self._in_braking_zone = False
         self.override_ready = False
         self.mom_active = False
         self.slipstream_reduction = 0.0
@@ -337,6 +352,7 @@ class Car:
             target_v = corner.apex_speed_ms * grip_factor * downforce_bonus * (0.98 + 0.04 * (consistency - 0.9))
 
             if dist == 0.0:
+                self._in_braking_zone = False
                 # Currently inside corner: check progress past apex
                 norm_pos = self.position % track_obj.length
                 corner_prog = (norm_pos - corner.start_pos) / max(1.0, corner.length)
@@ -370,16 +386,21 @@ class Car:
                     safety_margin = 1.04 - (braking_skill - 0.8) * 0.08
                     d_trigger = d_req * safety_margin
 
-                    if dist <= d_trigger:
+                    # Hysteresis latch: once braking is initiated, sustain through the deceleration zone
+                    if (self._in_braking_zone and dist <= d_trigger * 1.50) or (dist <= d_trigger):
+                        self._in_braking_zone = True
                         should_brake = True
                         urgency = max(0.70, min(1.0, (d_trigger / max(1.0, dist)) * 0.95))
                         target_brake_pressure = max(target_brake_pressure, urgency)
                         break
+                else:
+                    self._in_braking_zone = False
 
         if should_brake:
             self.throttle = 0.0
             self.brake = target_brake_pressure
         else:
+            self._in_braking_zone = False
             # Full acceleration along straights
             self.brake = 0.0
             self.throttle = 1.0
