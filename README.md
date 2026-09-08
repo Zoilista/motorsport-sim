@@ -71,7 +71,7 @@ Structured benchmark outputs are serialized to `scratch/sensitivity_results.json
 ```text
 motorsport-sim/
 ├── main.py                         # Application entry point & Qt event loop
-├── MODEL_ASSUMPTIONS.md            # Peer-reviewed engineering report & physics assumptions
+├── MODEL_ASSUMPTIONS.md            # Engineering model assumptions & physics documentation
 ├── simulation/                     # Headless deterministic simulation core
 │   ├── car.py                      # Longitudinal dynamics, fuel mass scaling & aero
 │   ├── driver.py                   # AI aggression, consistency & tyre management
