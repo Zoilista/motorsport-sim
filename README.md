@@ -1,8 +1,8 @@
 # 🏎️ Motorsport Simulation — Pit-Wall Telemetry & Race Control
 
-> *A deterministic, segment-based motorsport engineering simulation and 2026 technical regulations telemetry testbed.*
+A deterministic motorsport vehicle dynamics, telemetry, and race strategy platform built in **Python 3.11+** and **PySide6 (Qt for Python)**, inspired by modern Formula 1 technical regulations. Designed as an engineering testbed featuring SI-unit kinematics, 2026 active aerodynamics, 4-wheel thermodynamic tyre kinetics, and dynamic pit strategy loops.
 
-A high-fidelity Formula 1 telemetry, race strategy, and vehicle dynamics simulation built in **Python 3.11+** and **PySide6 (Qt for Python)**. Designed to mirror professional motorsport data-engineering workbenches with SI-unit kinematics, 2026 technical regulations, 4-wheel tyre thermodynamics, dynamic fuel mass scaling, and pit strategy.
+> **Engineering Note:** This platform is an independent computational model and telemetry workbench designed for educational and data-engineering analysis. It models segment-based kinematic approximations rather than multi-body aero-elastic wind-tunnel correlations. Full physical simplifications and boundaries are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
 
 ---
 
