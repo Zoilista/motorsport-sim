@@ -2,7 +2,7 @@
 
 A deterministic motorsport vehicle dynamics, telemetry, and race strategy platform built in **Python 3.11+** and **PySide6 (Qt for Python)**, inspired by modern Formula 1 technical regulations. Designed as an engineering testbed featuring SI-unit kinematics, 2026 active aerodynamics, 4-wheel thermodynamic tyre kinetics, and dynamic pit strategy loops.
 
-> **Engineering Note:** This platform is an independent computational model and telemetry workbench designed for educational and data-engineering analysis. It models segment-based kinematic approximations rather than multi-body aero-elastic wind-tunnel correlations. Full physical simplifications and boundaries are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
+> **Engineering Note:** This platform is an independent computational model and telemetry workbench designed for educational and data-engineering analysis. It models segment-based kinematic approximations calibrated against published Grand Prix engineering references and technical regulations rather than multi-body aero-elastic wind-tunnel correlations. Full physical simplifications, parameters, and verification boundaries are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
 
 ---
 
@@ -16,7 +16,7 @@ A deterministic motorsport vehicle dynamics, telemetry, and race strategy platfo
 - **4-Wheel Thermodynamic & Wear Kinetics (`simulation/tyre.py`):**
   - Independent cornering, braking, and traction heat fluxes across **FL, FR, RL, and RR**.
   - Dynamic lateral load transfer (e.g., severe thermal build-up on outside right tyres in anti-clockwise layouts like Istanbul Park Turn 8).
-  - Authentic compound specifications: **Soft (C3)**, **Medium (C2)**, and **Hard (C1)** with realistic degradation crossovers.
+  - Calibrated compound specifications: **Soft (C3)**, **Medium (C2)**, and **Hard (C1)** with non-linear degradation crossovers.
 - **Dynamic Race Strategy & Pit Lane Loop:**
   - 80 km/h pit speed limiter enforcement.
   - 2.4-second stationary pit box tyre changes and autonomous AI pit calls (`BOX THIS LAP`) based on tyre wear thresholds.
@@ -31,27 +31,29 @@ A deterministic motorsport vehicle dynamics, telemetry, and race strategy platfo
 
 ---
 
-## 🔬 Engineering Rigor & Model Validation
+## 🔬 Engineering Rigor & Model Calibration
 
 For a comprehensive mathematical breakdown of kinematic equations, aerodynamic assumptions, 4-wheel thermodynamic flux, and deliberate simplifications versus 6-DOF multi-body vehicle simulators, see **[MODEL_ASSUMPTIONS.md](MODEL_ASSUMPTIONS.md)**.
 
 ### Parametric Sensitivity Benchmarks (`scratch/run_sensitivity_study.py`)
 
-The simulation contains an automated parametric sensitivity suite that systematically audits physical models against empirical Formula 1 engineering telemetry:
+The simulation includes an automated parametric sensitivity suite that audits physical model responses against published Grand Prix engineering literature and regulatory reference targets:
 
 ```bash
 python scratch/run_sensitivity_study.py
 ```
 
-| Benchmark Parameter | Simulation Result | Empirical F1 Benchmark | Status |
+| Benchmark Parameter | Simulation Result | Target Reference Range (Literature) | Status |
 | :--- | :---: | :---: | :---: |
-| **Fuel Mass Penalty (Monza)** | **$0.360\text{ s} / 10\text{ kg}$** | $0.30 - 0.40\text{ s} / 10\text{ kg}$ | **PASS** |
-| **Active Aero X-Mode vs Z-Mode $\Delta v_{\max}$** | **$+16.0\text{ km/h}$** ($336.0$ vs $320.0$) | $+15 - 25\text{ km/h}$ | **PASS** |
-| **Active Aero X-Mode Lap Delta** | **$-1.300\text{ s}$** on Monza | $-1.0 - 2.0\text{ s}$ | **PASS** |
-| **Tyre Wear Ratio (Soft vs Medium)** | **$1.92\times$** ($16.9\%$ vs $8.8\%$) | Nominal $1.75\times$ | **PASS** |
-| **20 Hz CSV Telemetry Export** | **$2,165\text{ frames}$** ($157\text{ KB}$) | Continuous 20 Hz sync | **PASS** |
+| **Fuel Mass Penalty (Monza)** | **$0.360\text{ s} / 10\text{ kg}$** | $0.30 - 0.40\text{ s} / 10\text{ kg}$ | **Within Target Range** |
+| **Active Aero X-Mode vs Z-Mode $\Delta v_{\max}$** | **$+16.0\text{ km/h}$** ($336.0$ vs $320.0$) | $+15 - 25\text{ km/h}$ | **Within Target Range** |
+| **Active Aero X-Mode Lap Delta** | **$-1.200\text{ s}$** on Monza | $-1.0 - 2.0\text{ s}$ | **Within Target Range** |
+| **Tyre Wear Ratio (Soft vs Medium)** | **$1.92\times$** ($16.9\%$ vs $8.8\%$) | Nominal $1.75\times$ | **Within Target Range** |
+| **20 Hz CSV Telemetry Export** | **$2,166\text{ frames}$** ($157\text{ KB}$) | Continuous 20 Hz sync | **Verified** |
 
 Structured benchmark outputs are serialized to `scratch/sensitivity_results.json` after every run.
+
+> **Validation Status Notice:** Simulation benchmarks are verified against internal physics specifications and calibrated within literature-reported reference intervals. The model is not yet validated against raw external track telemetry data.
 
 ---
 
@@ -150,7 +152,7 @@ python main.py
 ## 🧪 Automated Testing & Diagnostics
 
 ```bash
-# Run Flagship Parametric Sensitivity & Model Validation Study
+# Run Flagship Parametric Sensitivity & Calibration Study
 python scratch/run_sensitivity_study.py
 
 # Run Senior QA Edge-Case & Stress Audit
