@@ -14,7 +14,7 @@ This simulation is engineered as a **deterministic, segment-based, 20 Hz kinemat
 - A **1D segment-based kinematic simulator** operating along the circuit path coordinate $s(t) \in [0, L_{\text{track}})$.
 - A **deterministic computational workbench** where identical initial conditions and driver parameters yield bitwise reproducible multi-lap telemetry traces.
 - A **real-time 20 Hz numerical testbed** ($dt = 0.05\text{ s}$) powering an asynchronous Model-View-ViewModel (MVVM) architecture for pit-wall engineering analytics.
-- A **calibrated parametric model** whose longitudinal limits, mass penalties, active aero drag deltas, and tyre wear orderings align with published Grand Prix engineering literature and regulatory benchmarks.
+- A **calibrated parametric model** whose longitudinal limits, mass penalties, active aero drag deltas, and tyre wear orderings are tuned against target engineering reference ranges and regulatory benchmarks.
 
 ### What the Simulation Is Not
 - **Not a 6-DOF multi-body vehicle dynamics solver:** There is no suspension kinematics, chassis pitch (brake dive), roll (anti-roll bar stiffness), or heave (third damper oscillation).
@@ -57,7 +57,7 @@ $$M_{\text{total}}(t) = M_{\text{dry}} + \max(0.0, M_{\text{fuel}}(t))$$
 - Minimum dry weight + driver: $M_{\text{dry}} = 798.0\text{ kg}$ (FIA Technical Regulation minimum).
 - Initial fuel capacity: $M_{\text{fuel}}(0) = 100.0\text{ kg}$.
 
-In high-downforce open-wheel racing, aerodynamic downforce at high speed ($F_z > 25\text{ kN}$) dominates the total tyre normal load, partially decoupling tyre grip and braking capacity from fuel mass. To reflect the published Grand Prix empirical sensitivity ($\approx 0.30 - 0.40\text{ s} / 10\text{ kg}$ lap time delta on high-speed circuits), inertial acceleration, braking deceleration, and cornering grip scale via the calibrated mass factor:
+In high-downforce open-wheel racing, aerodynamic downforce at high speed ($F_z > 25\text{ kN}$) dominates the total tyre normal load, partially decoupling tyre grip and braking capacity from fuel mass. To reflect the target engineering reference sensitivity ($\approx 0.30 - 0.40\text{ s} / 10\text{ kg}$ lap time delta on high-speed circuits), inertial acceleration, braking deceleration, and cornering grip scale via the calibrated mass factor:
 
 $$\text{mass\_factor} = \max\left(0.60, \min\left(1.10, \frac{M_{\text{dry}} + 10.0}{M_{\text{dry}} + 10.0 + \max(0.0, M_{\text{fuel}} - 10.0) \cdot 0.65}\right)\right)$$
 
@@ -418,7 +418,7 @@ Software verification confirms that the implementation correctly executes its sp
 - **Data Pipeline Integrity:** Continuous 20 Hz CSV telemetry export without NaN, null, or desync errors.
 
 ### 10.2 Parametric Sensitivity & Calibration: WITHIN TARGET RANGES
-The model parameters have been calibrated against published Grand Prix engineering references:
+The model parameters have been tuned against target engineering reference ranges:
 - **Fuel Mass Sensitivity:** Simulates $0.360\text{ s} / 10\text{ kg}$ lap time delta on Monza (target reference range: $0.30 - 0.40\text{ s} / 10\text{ kg}$).
 - **Active Aero Performance:** Active aero X-Mode delivers $+16.0\text{ km/h}$ top speed and $-1.200\text{ s}$ lap time advantage on Monza (target reference range: $+15 - 25\text{ km/h}$ and $-1.0 - 2.0\text{ s}$).
 - **Tyre Compound Ordering:** Soft compound achieves a $1.92\times$ wear rate ratio relative to Medium on Istanbul Park (target reference: $\approx 1.75\times$).

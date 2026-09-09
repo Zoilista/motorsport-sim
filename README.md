@@ -2,7 +2,7 @@
 
 A deterministic motorsport vehicle dynamics, telemetry, and race strategy platform built in **Python 3.11+** and **PySide6 (Qt for Python)**, inspired by modern Formula 1 technical regulations. Designed as an engineering testbed featuring SI-unit kinematics, 2026 active aerodynamics, 4-wheel thermodynamic tyre kinetics, and dynamic pit strategy loops.
 
-> **Engineering Note:** This platform is an independent computational model and telemetry workbench designed for educational and data-engineering analysis. It models segment-based kinematic approximations calibrated against published Grand Prix engineering references and technical regulations rather than multi-body aero-elastic wind-tunnel correlations. Full physical simplifications, parameters, and verification boundaries are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
+> **Engineering Note:** This platform is an independent computational model and telemetry workbench designed for educational and data-engineering analysis. It models segment-based kinematic approximations tuned against target engineering reference ranges and technical regulations rather than multi-body aero-elastic wind-tunnel correlations. Full physical simplifications, parameters, and verification boundaries are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
 
 ---
 
@@ -37,13 +37,13 @@ For a comprehensive mathematical breakdown of kinematic equations, aerodynamic a
 
 ### Parametric Sensitivity Benchmarks (`scratch/run_sensitivity_study.py`)
 
-The simulation includes an automated parametric sensitivity suite that audits physical model responses against published Grand Prix engineering literature and regulatory reference targets:
+The simulation includes an automated parametric sensitivity suite that audits physical model responses against target engineering reference ranges and regulatory benchmarks:
 
 ```bash
 python scratch/run_sensitivity_study.py
 ```
 
-| Benchmark Parameter | Simulation Result | Target Reference Range (Literature) | Status |
+| Benchmark Parameter | Simulation Result | Target Engineering Reference Range | Status |
 | :--- | :---: | :---: | :---: |
 | **Fuel Mass Penalty (Monza)** | **$0.360\text{ s} / 10\text{ kg}$** | $0.30 - 0.40\text{ s} / 10\text{ kg}$ | **Within Target Range** |
 | **Active Aero X-Mode vs Z-Mode $\Delta v_{\max}$** | **$+16.0\text{ km/h}$** ($336.0$ vs $320.0$) | $+15 - 25\text{ km/h}$ | **Within Target Range** |
@@ -53,7 +53,7 @@ python scratch/run_sensitivity_study.py
 
 Structured benchmark outputs are serialized to `scratch/sensitivity_results.json` after every run.
 
-> **Validation Status Notice:** Simulation benchmarks are verified against internal physics specifications and calibrated within literature-reported reference intervals. The model is not yet validated against raw external track telemetry data.
+> **Validation Status Notice:** Simulation benchmarks are verified against internal physics specifications and tuned against target engineering reference ranges. The model is not yet validated against raw external track telemetry data.
 
 ---
 
