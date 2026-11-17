@@ -1,175 +1,326 @@
-# 🏎️ Motorsport Simulation — Pit-Wall Telemetry & Race Control
+# Motorsport Simulation
+### A Deterministic Vehicle Simulation & Real-Time Telemetry Platform
 
-A deterministic motorsport vehicle dynamics, telemetry, and race strategy platform built in **Python 3.11+** and **PySide6 (Qt for Python)**, inspired by modern Formula 1 technical regulations. Designed as an engineering testbed featuring SI-unit kinematics, 2026 active aerodynamics, 4-wheel thermodynamic tyre kinetics, and dynamic pit strategy loops.
+A Python-based motorsport engineering project combining **mathematical modeling, vehicle dynamics, race strategy, telemetry processing, and desktop visualization**.
 
-> **Engineering Note:** This platform is an independent computational model and telemetry workbench designed for educational and data-engineering analysis. It models segment-based kinematic approximations tuned against target engineering reference ranges and technical regulations rather than multi-body aero-elastic wind-tunnel correlations. Full physical simplifications, parameters, and verification boundaries are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
+The project provides a deterministic, segment-based vehicle simulation engine and a PySide6 race-control dashboard. It explores simplified motorsport engineering models inspired by modern Formula racing systems, including active aerodynamics, hybrid energy recovery, tyre degradation, and pit strategy.
 
----
-
-## ⚡ Key Highlights & Architecture
-
-- **Deterministic Kinematic Core (`simulation/`):** Segment-based circuit geometry with quadratic aerodynamic drag, dynamic fuel mass scaling ($\approx 0.35\text{ s} / 10\text{ kg}$ lap time penalty), driver braking AI ($a \approx 4.3\text{G}$ decelerations), and continuous 20 Hz numerical integration.
-- **2026 FIA Technical Regulations:**
-  - **Active Aerodynamics:** Automated dual-state wing actuation (**Z-Mode** for high downforce in braking/corners, **X-Mode** with 40% drag reduction on straights yielding $+16\text{ km/h}$ top speed).
-  - **Aerodynamic Wake:** Distance-based slipstream on straights (up to 35% drag drop) and dirty-air cornering downforce penalties.
-  - **Hybrid ERS & Manual Override Mode (MOM):** 4.0 MJ battery storage, MGU-K kinetic braking regeneration (up to 350 kW), and automated MOM overtakes under $\Delta t \le 1.0\text{ s}$ detection gap.
-- **4-Wheel Thermodynamic & Wear Kinetics (`simulation/tyre.py`):**
-  - Independent cornering, braking, and traction heat fluxes across **FL, FR, RL, and RR**.
-  - Dynamic lateral load transfer (e.g., severe thermal build-up on outside right tyres in anti-clockwise layouts like Istanbul Park Turn 8).
-  - Calibrated compound specifications: **Soft (C3)**, **Medium (C2)**, and **Hard (C1)** with non-linear degradation crossovers.
-- **Dynamic Race Strategy & Pit Lane Loop:**
-  - 80 km/h pit speed limiter enforcement.
-  - 2.4-second stationary pit box tyre changes and autonomous AI pit calls (`BOX THIS LAP`) based on tyre wear thresholds.
-- **High-Frequency Telemetry Logging (`simulation/telemetry_recorder.py`):**
-  - Continuous 20 Hz CSV telemetry export (`telemetry_exports/race_telemetry.csv`) ready for offline engineering analytics, Pandas, Matplotlib, and FastF1 integration.
-- **Layout Scuderia (Apple-Clean UI in PySide6):**
-  - Real-world 2D circuit GPS/spline geometries with aspect-ratio-preserved scaling (`fitInView`).
-  - Edge-to-edge live speed telemetry waveform (0–350 km/h calibrated grid).
-  - Real-time Leaderboard with compound pills (`[S]`, `[M]`, `[H]`), tyre age, and pit status.
-  - Compact 6-metric bottom telemetry deck (`SPEED`, `GEAR`, `RPM`, `THROTTLE`, `BRAKE`, `AERO MODE`).
-  - Interactive **Setup Workbench Modal** (press `Space` to tune kinematics and trigger manual `BOX BOX` calls).
+> **Engineering Scope**
+>
+> This is an independent simulation and engineering workbench, not a professional-grade vehicle dynamics simulator or an FIA-certified implementation. Its models use deliberate simplifications to make vehicle behavior, energy systems, tyre dynamics, and race strategy computationally accessible. Model assumptions and limitations are documented in [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
 
 ---
 
-## 🔬 Engineering Rigor & Model Calibration
+## Key Features
 
-For a comprehensive mathematical breakdown of kinematic equations, aerodynamic assumptions, 4-wheel thermodynamic flux, and deliberate simplifications versus 6-DOF multi-body vehicle simulators, see **[MODEL_ASSUMPTIONS.md](MODEL_ASSUMPTIONS.md)**.
+### 1. Vehicle Dynamics & Simulation Engine
 
-### Parametric Sensitivity Benchmarks (`scratch/run_sensitivity_study.py`)
+The simulation core uses a deterministic, segment-based approach to model vehicle behavior.
 
-The simulation includes an automated parametric sensitivity suite that audits physical model responses against target engineering reference ranges and regulatory benchmarks:
+- Longitudinal vehicle dynamics using SI units.
+- Quadratic aerodynamic drag and rolling resistance.
+- Fuel-mass-dependent performance scaling.
+- Acceleration, braking, and speed management.
+- Cornering target speeds based on track geometry and tyre grip.
+- Driver behavior parameters for aggression, consistency, braking skill, and tyre management.
+- Fixed-step numerical integration with a nominal timestep of `0.05 seconds`.
 
-```bash
-python scratch/run_sensitivity_study.py
+### 2. Tyre Thermal & Degradation Model
+
+A four-wheel tyre model tracks each tyre independently:
+
+- Front-left, front-right, rear-left, and rear-right states.
+- Soft, Medium, and Hard compound configurations.
+- Temperature-dependent grip behavior.
+- Wear-dependent grip reduction.
+- Heat generation from braking, cornering, traction, and rolling resistance.
+- Temperature-dependent cooling.
+- Driver tyre-management parameters influencing degradation.
+
+The model separates thermal grip effects, wear effects, and compound characteristics.
+
+### 3. Aerodynamics & Hybrid Energy Systems
+
+The simulation includes simplified systems inspired by modern Formula racing technology.
+
+**Active Aerodynamics**
+- Z-MODE and X-MODE operating states.
+- Mode-dependent aerodynamic drag.
+- Automated mode transitions based on driving conditions.
+- Cornering and straight-line behavior.
+
+**Aerodynamic Wake**
+- Distance-dependent slipstream effect.
+- Reduced drag while following another car.
+- Dirty-air downforce penalty during cornering.
+
+**Energy Recovery & Deployment**
+- 4.0 MJ battery capacity.
+- MGU-K power and regenerative braking model with a 350 kW limit.
+- State-of-charge tracking.
+- Energy deployment and recovery.
+- MOM (Manual Override Mode) simulation for qualifying-style or overtake scenarios.
+
+These are configurable model parameters and simplified behaviors, not claims of exact real-world regulatory implementation.
+
+### 4. Race Strategy & Pit Stop System
+
+- Two-driver race simulation.
+- Dynamic race standings based on completed distance.
+- Tyre wear-based automatic pit requests.
+- Manual pit stop commands through the dashboard.
+- Next-compound selection.
+- Pit lane speed limiter.
+- Pit lane, pit box, and race-state tracking.
+
+### 5. Telemetry & Data Export
+
+The telemetry system exposes vehicle and race information for visualization and offline analysis.
+
+Available telemetry includes:
+
+- Speed, throttle, and brake input.
+- Gear and engine RPM.
+- Tyre temperatures and wear.
+- Fuel level and fuel flow.
+- ERS energy and state of charge.
+- Aerodynamic mode.
+- Tyre compound and stint information.
+- Pit stop and race state.
+
+Telemetry can be exported to CSV for further analysis using tools such as Python, Pandas, or Matplotlib.
+
+The included recorder writes selected telemetry fields; its sampling frequency depends on how frequently it is called by the application.
+
+### 6. PySide6 Race-Control Dashboard
+
+The desktop interface is designed around a motorsport pit-wall workflow.
+
+- Three-column race-control dashboard.
+- Interactive driver leaderboard.
+- Custom 2D circuit visualization.
+- Live speed telemetry graph with a rolling history window.
+- Individual four-wheel tyre temperature and wear displays.
+- Fuel and ERS monitoring.
+- Lap and sector timing panels.
+- Circuit selection.
+- Interactive vehicle setup workbench.
+- Manual pit stop controls.
+- Pause, resume, and session-finished states.
+
+The dashboard uses a nominal 50 ms update interval, corresponding to a target update rate of 20 Hz.
+
+---
+
+## Software Architecture
+
+The project separates simulation logic, presentation data, and graphical interface responsibilities.
+
+```text
+                 ┌──────────────────────────┐
+                 │       main.py            │
+                 │   Application Entry     │
+                 └────────────┬─────────────┘
+                              │
+                 ┌────────────▼─────────────┐
+                 │       PySide6 UI         │
+                 │  Dashboard & Widgets     │
+                 └────────────┬─────────────┘
+                              │
+                 ┌────────────▼─────────────┐
+                 │       ViewModel           │
+                 │ Snapshots, Timing, Data  │
+                 └────────────┬─────────────┘
+                              │
+                 ┌────────────▼─────────────┐
+                 │     Simulation Core       │
+                 │ Race, Car, Track, Tyres  │
+                 └──────────────────────────┘
 ```
 
-| Benchmark Parameter | Simulation Result | Target Engineering Reference Range | Status |
-| :--- | :---: | :---: | :---: |
-| **Fuel Mass Penalty (Monza)** | **$0.360\text{ s} / 10\text{ kg}$** | $0.30 - 0.40\text{ s} / 10\text{ kg}$ | **Within Target Range** |
-| **Active Aero X-Mode vs Z-Mode $\Delta v_{\max}$** | **$+16.0\text{ km/h}$** ($336.0$ vs $320.0$) | $+15 - 25\text{ km/h}$ | **Within Target Range** |
-| **Active Aero X-Mode Lap Delta** | **$-1.200\text{ s}$** on Monza | $-1.0 - 2.0\text{ s}$ | **Within Target Range** |
-| **Tyre Wear Ratio (Soft vs Medium)** | **$1.92\times$** ($16.9\%$ vs $8.8\%$) | Nominal $1.75\times$ | **Within Target Range** |
-| **20 Hz CSV Telemetry Export** | **$2,166\text{ frames}$** ($157\text{ KB}$) | Continuous 20 Hz sync | **Verified** |
+### Architectural Responsibilities
 
-Structured benchmark outputs are serialized to `scratch/sensitivity_results.json` after every run.
+| Layer | Responsibility |
+|---|---|
+| `simulation/` | Vehicle dynamics, race progression, tyres, tracks, and telemetry |
+| `ui/view_models/` | Converts simulation state into UI-ready snapshots and standings |
+| `ui/widgets/` | Reusable dashboard components and visualizations |
+| `ui/main_window.py` | Main application orchestration |
+| `ui/theme.py` | Centralized colors, typography, and QSS styling |
+| `telemetry_exports/` | Exported telemetry datasets |
+| `MODEL_ASSUMPTIONS.md` | Mathematical assumptions and model limitations |
 
-> **Validation Status Notice:** Simulation benchmarks are verified against internal physics specifications and tuned against target engineering reference ranges. The model is not yet validated against raw external track telemetry data.
-
----
-
-## 🏁 Supported Circuit Library
-
-| Circuit | Length | Direction | Key Architectural Characteristic |
-| :--- | :---: | :---: | :--- |
-| **Autodromo Nazionale Monza** | 5,793 m | Clockwise | Temple of Speed: Low drag, heavy braking into Variante del Rettifilo. |
-| **Intercity Istanbul Park** | 5,338 m | Anti-Clockwise | Quad-apex Turn 8: Extreme lateral G and asymmetric right tyre wear. |
-| **Silverstone Circuit** | 5,891 m | Clockwise | Modern Arena layout: Flowing Maggotts-Becketts-Chapel high-speed complex. |
-| **Prototype GP Circuit** | 5,200 m | Clockwise | Balanced development test bench. |
+The interface follows an **MVVM-inspired separation of concerns**, with a ViewModel adapter between the simulation engine and UI widgets.
 
 ---
 
-## 🛠️ Project Structure
+## Supported Circuits
+
+The dashboard provides a circuit selection interface for the following layouts:
+
+| Circuit | Configured Length |
+|---|---:|
+| Autodromo Nazionale Monza | 5,793 m |
+| Intercity Istanbul Park | 5,338 m |
+| Silverstone Circuit | 5,891 m |
+| Prototype GP Circuit | 5,200 m |
+
+Circuit geometry and segment data are simplified for simulation purposes. The 2D dashboard visualization is a spline-based representation, not a precision GPS or CAD model.
+
+---
+
+## Technology Stack
+
+| Technology | Application |
+|---|---|
+| Python 3.11+ | Core application and simulation logic |
+| PySide6 / Qt | Desktop GUI and event-driven interface |
+| NumPy | Numerical computing |
+| Object-Oriented Programming | Vehicle, race, track, and tyre models |
+| Dataclasses | Structured simulation and telemetry data |
+| CSV | Telemetry export |
+| QPainter | Custom 2D visualization |
+| QSS | Centralized Qt interface styling |
+
+---
+
+## Project Structure
 
 ```text
 motorsport-sim/
-├── main.py                         # Application entry point & Qt event loop
-├── MODEL_ASSUMPTIONS.md            # Engineering model assumptions & physics documentation
-├── simulation/                     # Headless deterministic simulation core
-│   ├── car.py                      # Longitudinal dynamics, fuel mass scaling & aero
-│   ├── driver.py                   # AI aggression, consistency & tyre management
-│   ├── race.py                     # Multi-car coordinator, gaps, AI strategy
-│   ├── telemetry.py                # Telemetry snapshot dataclasses
-│   ├── telemetry_recorder.py       # High-frequency 20 Hz CSV telemetry logger
-│   ├── track.py                    # Segment-based geometry & arc lengths
-│   ├── track_library.py            # Real-world circuit GPS spline waypoints
-│   └── tyre.py                     # 4-wheel thermal flux & compound kinetics
-├── telemetry_exports/              # Exported CSV telemetry logs
-│   └── race_telemetry.csv          # 20 Hz engineering telemetry dataset
-├── ui/                             # Modern PySide6 telemetry interface
-│   ├── theme.py                    # Dark carbon tokens & typography
-│   ├── main_window.py              # 3-column Layout Scuderia master shell
-│   ├── view_models/                # MVVM abstraction layer
-│   └── widgets/                    # Modular telemetry cards, canvas & dialogs
-└── scratch/                        # Automated regression & QA stress suites
-    ├── full_system_test.py         # 20 Hz multi-lap end-to-end audit
-    ├── qa_stress_test.py           # GUI stress & mathematical limit audit
-    ├── run_sensitivity_study.py    # Automated parametric sensitivity benchmarks
-    ├── sensitivity_results.json    # Machine-readable benchmark outputs
-    └── test_strategy_pitstops.py   # Tyre crossover & pit limiter verification
+│
+├── main.py
+│
+├── simulation/
+│   ├── car.py
+│   ├── driver.py
+│   ├── race.py
+│   ├── track.py
+│   ├── track_library.py
+│   ├── tyre.py
+│   ├── telemetry.py
+│   └── telemetry_recorder.py
+│
+├── ui/
+│   ├── main_window.py
+│   ├── theme.py
+│   ├── track_view.py
+│   │
+│   ├── view_models/
+│   │   └── race_view_model.py
+│   │
+│   └── widgets/
+│       ├── leaderboard.py
+│       ├── telemetry_panel.py
+│       ├── telemetry_card.py
+│       ├── telemetry_graph.py
+│       ├── track_view.py
+│       ├── race_status_panel.py
+│       ├── tyre_card.py
+│       ├── energy_card.py
+│       ├── setup_workbench.py
+│       └── car_setup_view.py
+│
+├── telemetry_exports/
+│   └── race_telemetry.csv
+│
+└── MODEL_ASSUMPTIONS.md
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- **Python 3.11+**
-- Virtual environment (`venv`)
+- Python 3.11 or newer
+- pip
+- A desktop environment supported by PySide6
 
 ### Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Zoilista/motorsport-sim.git
-   cd motorsport-sim
-   ```
+Clone the repository:
 
-2. **Create and activate a virtual environment:**
-   ```bash
-   # Windows (PowerShell)
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
+```bash
+git clone https://github.com/Zoilista/motorsport-sim.git
+cd motorsport-sim
+```
 
-   # Linux / macOS
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+Create a virtual environment:
 
-3. **Install dependencies:**
-   ```bash
-   pip install PySide6 numpy
-   ```
+**Windows (PowerShell)**
 
----
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
 
-## 🎮 Running the Simulation
+**Linux / macOS**
 
-Run the pit-wall desktop client:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install PySide6 numpy
+```
+
+### Run
+
 ```bash
 python main.py
 ```
 
-### Keyboard & UI Controls
+---
 
-- **Spacebar**: Toggle pause / open the **Setup Workbench & Diagnostics Dialog**.
-- **Top Bar Circuit Dropdown**: Switch circuits dynamically mid-session.
-- **Leaderboard Click**: Select and focus telemetry view on **Driver A (#07)** or **Driver B (#22)**.
-- **Workbench Controls**: Live-tune downforce, mechanical grip, acceleration, and trigger manual **`CALL BOX BOX`** pit stops.
+## Dashboard Controls
+
+| Control | Action |
+|---|---|
+| Space | Open or toggle the setup workbench / pause workflow |
+| Circuit selector | Change the active circuit |
+| Leaderboard row | Select a driver |
+| Setup workbench | Adjust vehicle parameters |
+| Pit controls | Request a pit stop and select the next tyre compound |
+| Resume | Continue the simulation |
 
 ---
 
-## 🧪 Automated Testing & Diagnostics
+## Model Assumptions & Limitations
 
-```bash
-# Run Flagship Parametric Sensitivity & Calibration Study
-python scratch/run_sensitivity_study.py
+The simulation intentionally prioritizes an understandable, modular engineering model over high-fidelity vehicle dynamics.
 
-# Run Senior QA Edge-Case & Stress Audit
-python scratch/qa_stress_test.py
+Current limitations include:
 
-# Run Full-Stack 20 Hz End-to-End Multi-Lap Regression
-python scratch/full_system_test.py
+- Segment-based longitudinal vehicle dynamics rather than a complete 6-DOF vehicle model.
+- Simplified aerodynamic drag and downforce relationships.
+- Simplified tyre thermal and wear behavior rather than a transient Pacejka tyre model.
+- No CFD or wind-tunnel validation.
+- Simplified circuit geometry and corner representation.
+- Approximate time-gap calculations based on distance and current speed.
+- Fixed-step numerical integration, which limits timing resolution.
+- Model parameters are not calibrated against a complete external real-world telemetry dataset.
 
-# Run Tyre Compound Crossover & Pit Lane Test
-python scratch/test_strategy_pitstops.py
-```
+For the mathematical details, equations, parameter values, and implementation assumptions, see [`MODEL_ASSUMPTIONS.md`](MODEL_ASSUMPTIONS.md).
 
 ---
 
-## ⚖️ Quality Assurance & Code Standards
+## Project Direction
 
-- **Pyright / Mypy**: 0 Errors, 0 Warnings (Strict type safety)
-- **Flake8 / Ruff**: 100% Clean (PEP 8 compliant)
-- **Architecture**: Decoupled Model-View-ViewModel (MVVM)
-- **Mathematical Rigor**: SI units throughout ($m$, $m/s$, $m/s^2$, $kg$, $kW$, $MJ$, $^\circ C$)
+The project is an ongoing exploration of the intersection between:
+
+- Mathematical modeling
+- Numerical simulation
+- Vehicle dynamics
+- Data processing and telemetry
+- Software architecture
+- Engineering visualization
+
+Future development can focus on improving model validation, automated testing, telemetry analysis, simulation accuracy, and extensibility.
+
+---
+
+**Built as an independent engineering and software development project.**
